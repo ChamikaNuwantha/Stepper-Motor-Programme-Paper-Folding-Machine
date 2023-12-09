@@ -18,6 +18,6 @@ This repository contains the Arduino code for a paper folding machine. The code 
 ### Hardware Setup
 
 1. Connect the stepper motor to the specified pins (`STEP_PIN` and `DIR_PIN`).
-2. Connect buttons to pins for enable/disable (`ENABLE_PIN`), reset (`RESET_PIN`), start/stop (`START_STOP_PIN`), and speed control (`SPEED_PIN`).
+2. Connect buttons to pins for enable/disable (`CONT_PIN`), reset (`RESET_PIN`), start/stop (`START_STOP_PIN`), and speed control (`SPEED_PIN`).
 3. Connect digital outputs to pins D6, D7, D11, and D12 as specified.
 
