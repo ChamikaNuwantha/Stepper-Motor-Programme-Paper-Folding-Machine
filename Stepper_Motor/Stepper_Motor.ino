@@ -2,39 +2,68 @@
 
 #define STEP_PIN 2
 #define DIR_PIN 5
-#define START_STOP_PIN 13  // Connect to a button to ground to turn on/off
+#define ENABLE_PIN 13  // Connect to a button to ground to turn on/off
 #define RESET_PIN 3
 #define SPEED_PIN A7
-#define STOP_PIN A0
+#define START_STOP_PIN A0
+
+#define D6_PIN 6
+#define D7_PIN 7
+#define D11_PIN 11
+#define D12_PIN 12
 
 AccelStepper stepper(1, STEP_PIN, DIR_PIN);
 
-int MaxSpeed;
-int LowSpeed = MaxSpeed/2;
+int MaxSpeed;  
+int LowSpeed;
 
 bool hasResetOccurred = false; // Flag to track if the reset operation has occurred
-bool hasStartOccurred = false;
-
 
 void setup() {
-  pinMode(STOP_PIN, INPUT_PULLUP); // Connect to a button. When low, stop the motor
+  pinMode(ENABLE_PIN, OUTPUT); // Connect to a button. When low, start or stop the motor
   pinMode(RESET_PIN, INPUT_PULLUP);
   pinMode(START_STOP_PIN, INPUT_PULLUP);
   pinMode(SPEED_PIN, INPUT);
+  
+  pinMode(D6_PIN, OUTPUT);
+  pinMode(D7_PIN, OUTPUT);
+  pinMode(D11_PIN, OUTPUT);
+  pinMode(D12_PIN, OUTPUT);
 
-  // digitalWrite(ENABLE_PIN, HIGH);  // Enable the motor driver
+  digitalWrite(ENABLE_PIN, HIGH);  // Enable the motor driver
 
   stepper.setMaxSpeed(1000);  // Set the initial maximum speed in steps per second
 }
 
 void loop() {
-  // if (digitalRead(STOP_PIN) == LOW && !hasResetOccurred) {
-  //     resetMotor();
-  //     hasResetOccurred = true;
-  // }
+  int currentStep = stepper.currentPosition();
 
-  if (digitalRead(STOP_PIN) == LOW) {
-    stopMotor();
+  // D6 should be high at 5-50 and 100-200 steps
+  if ((currentStep >= 5 && currentStep <= 50) || (currentStep >= 100 && currentStep <= 200)) {
+    digitalWrite(D6_PIN, HIGH);
+  } else {
+    digitalWrite(D6_PIN, LOW);
+  }
+
+  // D7 should be high at 15-50 and 120-180 steps
+  if ((currentStep >= 15 && currentStep <= 50) || (currentStep >= 120 && currentStep <= 180)) {
+    digitalWrite(D7_PIN, HIGH);
+  } else {
+    digitalWrite(D7_PIN, LOW);
+  }
+
+  // D11 should be low at 40-50 and 100-200 steps
+  if ((currentStep >= 40 && currentStep <= 50) || (currentStep >= 100 && currentStep <= 200)) {
+    digitalWrite(D11_PIN, LOW);
+  } else {
+    digitalWrite(D11_PIN, HIGH);
+  }
+
+  // D12 should be low at 60-70 and 100-150 steps
+  if ((currentStep >= 60 && currentStep <= 70) || (currentStep >= 100 && currentStep <= 150)) {
+    digitalWrite(D12_PIN, LOW);
+  } else {
+    digitalWrite(D12_PIN, HIGH);
   }
 
   if (digitalRead(RESET_PIN) == LOW && !hasResetOccurred) {
@@ -42,14 +71,12 @@ void loop() {
     hasResetOccurred = true;
   }
 
-  if (digitalRead(START_STOP_PIN) == LOW && !hasStartOccurred) {
+  if (digitalRead(START_STOP_PIN) == LOW) {
     toggleMotor();
-    hasStartOccurred = true;
   }
 
-  if (digitalRead(START_STOP_PIN) == LOW && stepper.isRunning()) {
+  if (digitalRead(START_STOP_PIN) == HIGH && stepper.isRunning()) {
     stepper.stop();
-    hasStartOccurred = false;
   }
 
   if (digitalRead(SPEED_PIN) == HIGH) {
@@ -57,8 +84,10 @@ void loop() {
   }
 
   if (digitalRead(SPEED_PIN) == LOW && digitalRead(START_STOP_PIN) == HIGH) {
+    // Read the analog value from A7 and map it to the desired speed range
     int analogValue = analogRead(A7);
-    MaxSpeed = map(analogValue, 0, 1023, 0, 700); // Adjust the range as needed.. initially set the maximum pulse per second as 700
+    MaxSpeed = map(analogValue, 0, 1023, 0, 700); // Adjust the range as needed
+    LowSpeed = MaxSpeed / 2;
 
     stepper.setMaxSpeed(MaxSpeed);
     runMotor();
