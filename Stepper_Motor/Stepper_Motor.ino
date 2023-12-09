@@ -74,11 +74,12 @@ void loop() {
 
 
   if (digitalRead(CONT_PIN) == LOW && !hasStartOccurred) {
-      startmotor();
-      
-    else if (CONT_PIN) == LOW && hasStartOccurred)
+      startMotor();
+  }
+    else if (digitalRead(CONT_PIN) == LOW && hasStartOccurred){
       resetMotor();
       stopMotor();
+    
   }
 
 
@@ -114,7 +115,6 @@ void toggleMotor() {
     stepper.stop();
   } else {
     startMotor();
-    runMotor();
   }
 }
 
@@ -146,11 +146,9 @@ void startMotor() {
     stepper.runSpeed();
   }
 
-  // Run continuously at maximum speed
   stepper.setSpeed(MaxSpeed);
   while (!hasResetOccurred) {
     stepper.runSpeed();
-    // Add any additional code here if needed
   }
 }
 
