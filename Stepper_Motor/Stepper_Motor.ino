@@ -22,7 +22,7 @@ void setup() {
   pinMode(START_STOP_PIN, INPUT_PULLUP);
   pinMode(SPEED_PIN, INPUT);
 
-  digitalWrite(ENABLE_PIN, HIGH);  // Enable the motor driver
+  // digitalWrite(ENABLE_PIN, HIGH);  // Enable the motor driver
 
   stepper.setMaxSpeed(1000);  // Set the initial maximum speed in steps per second
 }
@@ -32,6 +32,10 @@ void loop() {
   //     resetMotor();
   //     hasResetOccurred = true;
   // }
+
+  if (digitalRead(STOP_PIN) == LOW) {
+    stopMotor();
+  }
 
   if (digitalRead(RESET_PIN) == LOW && !hasResetOccurred) {
     resetMotor();
