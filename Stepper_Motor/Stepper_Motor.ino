@@ -1,177 +1,143 @@
-#include <AccelStepper.h>
+#include <Button.h>
 
 #define STEP_PIN 4
-#define DIR_PIN 5
-#define CONT_PIN 13  // Connect to a button to ground to turn on/off
-#define RESET_PIN 3
-#define SPEED_PIN A7
-#define MOTOR_STOP A0
+int fullPulse = 700;
+int halfPulse = 350;
+int rpm = 200;
 
-#define D6_PIN 6
-#define D7_PIN 7
-#define D11_PIN 11
-#define D12_PIN 12
 
-AccelStepper stepper(1, STEP_PIN, DIR_PIN);
-
-int MaxSpeed;  
-int LowSpeed;
-
-bool hasResetOccurred = false; // Flag to track if the reset operation has occurred
-bool hasStartOccurred = false;
+int pulse;
+int rpm_t;
+Button sw12(12);
+Button sw13(9);
+Button swA3(A3);
 
 void setup() {
-  pinMode(CONT_PIN, INPUT); // Connect to a button. When low, start or stop the motor
-  pinMode(RESET_PIN, INPUT_PULLUP);
-  pinMode(MOTOR_STOP, INPUT_PULLUP);
-  pinMode(SPEED_PIN, INPUT);
-  
-  pinMode(D6_PIN, OUTPUT);
-  pinMode(D7_PIN, OUTPUT);
-  pinMode(D11_PIN, OUTPUT);
-  pinMode(D12_PIN, OUTPUT);
+  Serial.begin(9600);
+  pinMode(STEP_PIN, OUTPUT);
+  pinMode(A7, INPUT_PULLUP);
 
-  // digitalWrite(CONT_PIN, HIGH);  // Enable the motor driver
+  pinMode(6, OUTPUT);
+  pinMode(7, OUTPUT);
+  pinMode(10, OUTPUT);
+  pinMode(11, OUTPUT);
 
-  stepper.setMaxSpeed(1000);  // Set the initial maximum speed in steps per second
+  digitalWrite(6, LOW);
+  digitalWrite(7, LOW);
+  digitalWrite(10, HIGH);
+  digitalWrite(11, HIGH);
+
+  pinMode(A3, OUTPUT);
+  pinMode(11, OUTPUT);
+
+  pinMode(3, INPUT_PULLUP);
+
+  sw12.begin();
+  sw13.begin();
+  swA3.begin();
 }
 
+int stepCount = 0;
+bool motorEnable = true;
+bool timeTrigger = false;
+long time = 0;
 void loop() {
-  int currentStep = stepper.currentPosition();
+  int potRead = analogRead(A7);
 
-  // D6 should be high at 5-50 and 100-200 steps
-  if ((currentStep >= 5 && currentStep <= 50) || (currentStep >= 100 && currentStep <= 200)) {
-    digitalWrite(D6_PIN, HIGH);
-  } else {
-    digitalWrite(D6_PIN, LOW);
+  if (digitalRead(3) == LOW) {
+    Serial.println("Reset...");
+    stepCount = 0;
+    motorEnable = true;
+    timeTrigger = false;
+    time = 0;
+    digitalWrite(6, LOW);
+    digitalWrite(7, LOW);
+    digitalWrite(10, HIGH);
+    digitalWrite(11, HIGH);
   }
 
-  // D7 should be high at 15-50 and 120-180 steps
-  if ((currentStep >= 15 && currentStep <= 50) || (currentStep >= 120 && currentStep <= 180)) {
-    digitalWrite(D7_PIN, HIGH);
-  } else {
-    digitalWrite(D7_PIN, LOW);
+  if (sw13.toggled()) {
+    if (sw13.read() == Button::PRESSED) {
+      timeTrigger = !timeTrigger;
+      time = millis();
+    }
   }
 
-  // D11 should be low at 40-50 and 100-200 steps
-  if ((currentStep >= 40 && currentStep <= 50) || (currentStep >= 100 && currentStep <= 200)) {
-    digitalWrite(D11_PIN, LOW);
-  } else {
-    digitalWrite(D11_PIN, HIGH);
+  if (timeTrigger) {
+    int currTime = millis() - time;
+    if (currTime > 500 && currTime < 1200) {
+      digitalWrite(A4, HIGH);
+    } else {
+      digitalWrite(A4, LOW);
+    }
+    if (currTime > 1000 && currTime < 1400) {
+      digitalWrite(A5, HIGH);
+    } else {
+      digitalWrite(A5, LOW);
+    }
   }
 
-  // D12 should be low at 60-70 and 100-150 steps
-  if ((currentStep >= 60 && currentStep <= 70) || (currentStep >= 100 && currentStep <= 150)) {
-    digitalWrite(D12_PIN, LOW);
-  } else {
-    digitalWrite(D12_PIN, HIGH);
+  switch (stepCount) {
+    case 15:
+      digitalWrite(6, HIGH);
+      break;
+    case 20:
+      pulse = halfPulse;
+      break;
+    case 40:
+      digitalWrite(7, HIGH);
+      digitalWrite(10, LOW);
+      digitalWrite(11, LOW);
+      break;
+    case 50:
+      digitalWrite(6, LOW);
+      break;
+    case 60:
+      digitalWrite(7, LOW);
+      digitalWrite(10, HIGH);
+      digitalWrite(11, HIGH);
+      break;
+    case 65:
+      digitalWrite(6, HIGH);
+      break;
+    case 80:
+      digitalWrite(6, LOW);
+      digitalWrite(7, HIGH);
+      digitalWrite(10, LOW);
+      digitalWrite(11, LOW);
+      break;
+    case 100:
+      pulse = map(potRead, 0, 1023, 0, fullPulse);
+      break;
+    case 330:
+      pulse = halfPulse;
+      break;
+    case 430:
+      pulse = map(potRead, 0, 1023, 0, fullPulse);
+      break;
   }
 
-  if (digitalRead(RESET_PIN) == LOW && !hasResetOccurred) {
-    resetMotor();
-    hasResetOccurred = true;
+  rpm_t = 80000000 / 2 / pulse / rpm;
+
+  if (sw12.toggled()) {
+    if (sw12.read() == Button::PRESSED) {
+      Serial.println("12 Triggered");
+      motorEnable = !motorEnable;
+    }
   }
 
-
-  if (digitalRead(CONT_PIN) == LOW && !hasStartOccurred) {
-      startMotor();
-  }
-    else if (digitalRead(CONT_PIN) == LOW && hasStartOccurred){
-      resetMotor();
-      stopMotor();
-    
+  if (sw13.toggled()) {
+    if (sw13.read() == Button::PRESSED) {
+      Serial.println("13 Triggered");
+      motorEnable = !motorEnable;
+    }
   }
 
-
-  // if (digitalRead(MOTOR_STOP) == HIGH) {
-  //   toggleMotor();
-  // }
-
-  if (digitalRead(MOTOR_STOP) == LOW && stepper.isRunning()) {
-    stopMotor();
-  }
-
-  // if (digitalRead(SPEED_PIN) == HIGH) {
-  //   stopMotor();
-  // }
-
-  if (digitalRead(SPEED_PIN) == LOW && digitalRead(MOTOR_STOP) == HIGH) {
-    // Read the analog value from A7 and map it to the desired speed range
-    int analogValue = analogRead(A7);
-    MaxSpeed = map(analogValue, 0, 1023, 0, 700); // Adjust the range as needed
-    LowSpeed = MaxSpeed / 2;
-
-    // stepper.setMaxSpeed(MaxSpeed);
-    runMotor();
-  }
-}
-
-void resetMotor() {
-  stepper.setCurrentPosition(0);
-}
-
-void toggleMotor() {
-  if (stepper.isRunning()) {
-    stepper.stop();
-  } else {
-    startMotor();
-  }
-}
-
-void stopMotor() {
-  stepper.stop();
-  hasStartOccurred = false;
-}
-
-// void startmotor(){
-//     for (int i = 0; i < 50; ++i) {
-//     int currentSpeed = map(i, 0, 49, 0, MaxSpeed);  // Map the speed from 0 to maxspeed in 50 steps
-//     stepper.setSpeed(currentSpeed);
-//     stepper.runSpeedToPosition();
-//     stepper.runSpeed();
-//   }
-//   hasStartOccurred = true;
-//   stepper.moveTo(50);  // Move 50 steps maintaining constant speed
-//   stepper.runToPosition();
-
-//   // delay(1000);
-// }
-
-void startMotor() {
-  // Accelerate to maximum speed
-  for (int i = 0; i < 50; ++i) {
-    int currentSpeed = map(i, 0, 49, 0, MaxSpeed);  // Map the speed from 0 to maxspeed in 50 steps
-    stepper.setSpeed(currentSpeed);
-    stepper.runSpeedToPosition();
-    stepper.runSpeed();
-  }
-
-  stepper.setSpeed(MaxSpeed);
-  while (!hasResetOccurred) {
-    stepper.runSpeed();
-  }
-}
-
-
-void runMotor() {
-
-  for (int i = 0; i < 100; ++i) {
-    stepper.setSpeed(MaxSpeed);  // Set speed for the first 100 steps
-    stepper.runSpeedToPosition();
-  }
-
-  for (int i = 0; i < 50; ++i) {
-    stepper.setSpeed(LowSpeed);  // Slow down in 50 steps
-    stepper.runSpeedToPosition();
-  }
-
-  for (int i = 0; i < 50; ++i) {
-    stepper.setSpeed(MaxSpeed);  // Speed up back to normal speed in 50 steps
-    stepper.runSpeedToPosition();
-  }
-
-  for (int i = 0; i < 100; ++i) {
-    stepper.setSpeed(MaxSpeed);  // Continue at normal speed for the next 100 steps
-    stepper.runSpeedToPosition();
+  if (motorEnable) {
+    stepCount++;
+    digitalWrite(STEP_PIN, HIGH);
+    delayMicroseconds(rpm_t);
+    digitalWrite(STEP_PIN, LOW);
+    delayMicroseconds(rpm_t);
   }
 }
